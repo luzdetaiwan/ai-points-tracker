@@ -248,7 +248,7 @@
           {/* 公告說明卡片 */}
           <div className="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 p-5 rounded-xl shadow-sm mb-6">
             <h2 className="font-bold text-indigo-800 text-lg mb-3 flex items-center gap-2">
-               哈囉 一起Share Gemini Pro的家人們❤️
+               哈囉❤️一起Share Gemini Pro的家人們
             </h2>
             <div className="text-slate-600 text-sm space-y-2 leading-relaxed">
               <p>我們使用的 Pro 方案，每月會贈送 <strong className="text-indigo-600">1000點</strong> 的 AI 點數。</p>
@@ -292,7 +292,7 @@
                    <input className={`w-full p-2 border rounded focus:outline-none ${formData.isDonated ? 'bg-slate-100' : 'border-slate-300'}`} type="number" name="points" value={formData.points} onChange={handleInputChange} disabled={formData.isDonated || isSubmittingVisual} />
                 </div>
               </div>
-              <input className="w-full p-2 border border-slate-300 rounded" type="text" name="note" placeholder="備註" value={formData.note} onChange={handleInputChange} disabled={isSubmittingVisual} />
+              <input className="w-full p-2 border border-slate-300 rounded" type="text" name="note" placeholder="備註(選填)" value={formData.note} onChange={handleInputChange} disabled={isSubmittingVisual} />
               
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="isDonated" checked={formData.isDonated} onChange={handleInputChange} className="w-4 h-4" disabled={isSubmittingVisual} />
