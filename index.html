@@ -45,6 +45,10 @@
     // ▲▲▲ 設定結束 ▲▲▲
     // ==========================================
 
+    // ▼▼▼ 設定您的家族密碼 ▼▼▼
+    const FAMILY_PASSWORD = "gemini666"; 
+    // ▲▲▲ 您可以改成自己喜歡的數字 ▲▲▲
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -53,43 +57,53 @@
     const STANDARD_QUOTA = 166;
 
     function App() {
+      // --- 密碼鎖定狀態 ---
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+      const [inputPwd, setInputPwd] = useState("");
+      const [pwdError, setPwdError] = useState("");
+
+      // --- 主程式狀態 ---
       const [user, setUser] = useState(null);
       const [usersData, setUsersData] = useState([]);
       const [loading, setLoading] = useState(true);
-      
       const isSubmittingRef = useRef(false);
       const [isSubmittingVisual, setIsSubmittingVisual] = useState(false);
-
       const [isEditing, setIsEditing] = useState(false);
       const [editId, setEditId] = useState(null);
       const [formData, setFormData] = useState({ name: '', points: 0, note: '', isDonated: false });
       const [error, setError] = useState('');
 
-      // 修改後的日期邏輯：每月 25 號自動切換到下個月
+      // 檢查有沒有存過密碼 (讓家人不用每次都輸入)
+      useEffect(() => {
+        const savedPwd = localStorage.getItem("family_pwd");
+        if (savedPwd === FAMILY_PASSWORD) {
+          setIsLoggedIn(true);
+        }
+      }, []);
+
+      // 每月 25 號自動切換邏輯
       const currentMonthKey = useMemo(() => {
         const now = new Date();
         let year = now.getFullYear();
-        let month = now.getMonth() + 1; // 0-11 轉 1-12
+        let month = now.getMonth() + 1;
         const day = now.getDate();
-
-        // 如果今天是 25 號(含)以後，歸類為下個月的帳
         if (day >= 25) {
           month += 1;
-          if (month > 12) {
-            month = 1;
-            year += 1;
-          }
+          if (month > 12) { month = 1; year += 1; }
         }
         return `${year}-${String(month).padStart(2, '0')}`;
       }, []);
 
+      // 初始化 Firebase Auth (只在解鎖後執行)
       useEffect(() => {
+        if (!isLoggedIn) return;
         signInAnonymously(auth).catch((e) => console.error(e));
         return onAuthStateChanged(auth, setUser);
-      }, []);
+      }, [isLoggedIn]);
 
+      // 讀取資料 (只在解鎖後執行)
       useEffect(() => {
-        if (!user) return;
+        if (!user || !isLoggedIn) return;
         const q = collection(db, 'artifacts', appId, 'public', 'data', 'ai_points_users_v2');
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const allData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -99,8 +113,47 @@
           setLoading(false);
         });
         return () => unsubscribe();
-      }, [user, currentMonthKey]);
+      }, [user, currentMonthKey, isLoggedIn]);
 
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (inputPwd === FAMILY_PASSWORD) {
+          setIsLoggedIn(true);
+          localStorage.setItem("family_pwd", inputPwd); // 記住密碼
+          setPwdError("");
+        } else {
+          setPwdError("密碼錯誤，請詢問家人");
+        }
+      };
+
+      // === 如果還沒解鎖，顯示鎖定畫面 ===
+      if (!isLoggedIn) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-lg max-w-sm w-full text-center">
+              <div className="text-4xl mb-4">🔒</div>
+              <h1 className="text-xl font-bold text-slate-800 mb-2">AI 點數共用表</h1>
+              <p className="text-slate-500 mb-6 text-sm">請輸入家族通行碼</p>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <input 
+                  type="text" // 改成 text 比較好打數字，如果要隱藏可改 password
+                  value={inputPwd}
+                  onChange={(e) => setInputPwd(e.target.value)}
+                  className="w-full text-center text-2xl tracking-widest p-3 border border-slate-300 rounded-xl focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="Passcode"
+                  inputMode="numeric"
+                />
+                {pwdError && <div className="text-red-500 text-sm">{pwdError}</div>}
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors">
+                  解鎖進入
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      // === 以下是主程式 ===
       const totalUsed = usersData.reduce((acc, curr) => acc + (curr.isDonated ? 0 : Number(curr.points)), 0);
       const poolPercentage = Math.min(100, Math.max(0, (totalUsed / TOTAL_POOL) * 100));
       const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("網路回應過慢，請重試")), ms));
@@ -148,7 +201,7 @@
           resetForm();
         } catch (err) { 
           console.error(err);
-          alert("存檔失敗，請檢查網路連線"); 
+          alert("存檔失敗: " + err.message); 
         } finally {
           isSubmittingRef.current = false;
           setIsSubmittingVisual(false);
@@ -185,17 +238,17 @@
       const renderStatus = (points, isDonated) => {
         if (isDonated) return { label: '❤️ 全額捐贈', color: 'text-rose-500 bg-rose-50' };
         if (points > STANDARD_QUOTA) return { label: `📈 超額 ${points - STANDARD_QUOTA}`, color: 'text-amber-600 bg-amber-50' };
-        if (points < STANDARD_QUOTA) return { label: `🔖 還剩餘 ${STANDARD_QUOTA - points}`, color: 'text-emerald-600 bg-emerald-50' };
+        if (points < STANDARD_QUOTA) return { label: `📉 省下 ${STANDARD_QUOTA - points}`, color: 'text-emerald-600 bg-emerald-50' };
         return { label: '✅ 標準額度', color: 'text-slate-500 bg-slate-50' };
       };
 
       return (
         <div className="max-w-3xl mx-auto p-4 pb-12 font-sans">
           
-          {/* 公告說明卡片 (新加入的部分) */}
+          {/* 公告說明卡片 */}
           <div className="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 p-5 rounded-xl shadow-sm mb-6">
             <h2 className="font-bold text-indigo-800 text-lg mb-3 flex items-center gap-2">
-              哈囉 一起Share Gemini Pro的家人們❤️
+              <span>❤️</span> 哈囉 一起share Gemini Pro的家人們
             </h2>
             <div className="text-slate-600 text-sm space-y-2 leading-relaxed">
               <p>我們使用的 Pro 方案，每月會贈送 <strong className="text-indigo-600">1000點</strong> 的 AI 點數。</p>
@@ -239,7 +292,7 @@
                    <input className={`w-full p-2 border rounded focus:outline-none ${formData.isDonated ? 'bg-slate-100' : 'border-slate-300'}`} type="number" name="points" value={formData.points} onChange={handleInputChange} disabled={formData.isDonated || isSubmittingVisual} />
                 </div>
               </div>
-              <input className="w-full p-2 border border-slate-300 rounded" type="text" name="note" placeholder="備註(選填)" value={formData.note} onChange={handleInputChange} disabled={isSubmittingVisual} />
+              <input className="w-full p-2 border border-slate-300 rounded" type="text" name="note" placeholder="備註" value={formData.note} onChange={handleInputChange} disabled={isSubmittingVisual} />
               
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="isDonated" checked={formData.isDonated} onChange={handleInputChange} className="w-4 h-4" disabled={isSubmittingVisual} />
@@ -295,5 +348,8 @@
   </script>
 </body>
 </html>
+
+
+
 
 
