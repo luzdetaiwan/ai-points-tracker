@@ -238,7 +238,7 @@
       const renderStatus = (points, isDonated) => {
         if (isDonated) return { label: '❤️ 全額捐贈', color: 'text-rose-500 bg-rose-50' };
         if (points > STANDARD_QUOTA) return { label: `📈 超額 ${points - STANDARD_QUOTA}`, color: 'text-amber-600 bg-amber-50' };
-        if (points < STANDARD_QUOTA) return { label: `📉 省下 ${STANDARD_QUOTA - points}`, color: 'text-emerald-600 bg-emerald-50' };
+        if (points < STANDARD_QUOTA) return { label: `🔖 還剩餘 ${STANDARD_QUOTA - points}`, color: 'text-emerald-600 bg-emerald-50' };
         return { label: '✅ 標準額度', color: 'text-slate-500 bg-slate-50' };
       };
 
